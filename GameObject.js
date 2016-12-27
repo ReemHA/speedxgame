@@ -5,6 +5,7 @@ var GameObject = function (cannonBody, threeBody) {
     ///<param name="cannonBody" type="CANNON.Body">
     this.cannonBody = cannonBody;
     this.threeBody = threeBody;
+    this.position = cannonBody.position;
     this.link = function () {
         this.threeBody.position.copy(cannonBody.position);
         this.threeBody.quaternion.copy(cannonBody.quaternion);

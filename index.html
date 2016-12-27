@@ -11,13 +11,13 @@
 </head>
 <body>
     <script>
-        // create array for all game objects in the enviroment
+        // create queue for all game objects in the enviroment.
         var gameObjects = [];
+        let width = 50, height = 20, depth = 50;
+        let zLimit = 200;
+        var minZ = 0;
 
-        // create a pool of cubes
-        var cubesPool = new Pool();
-
-        // initialize Three enviroment
+        // initialize Three enviroment.
         var scene = new THREE.Scene();
         var camera = new THREE.PerspectiveCamera(60, 16.0 / 9.0, 0.1, 1000);
         var renderer = new THREE.WebGLRenderer();
@@ -27,48 +27,64 @@
         camera.position.y = 50;
         camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-        // initialize Cannon world
+        // initialize Cannon world.
         var world = new CANNON.World();
         world.gravity.set(0, -10, 0);
 
-        // create the cube mesh
+        // create the cube mesh without adding it to the scene.
         var cubeMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         cubeMaterial.wireframe = true;
-        var cubeGeometry = new THREE.BoxGeometry(100, 20, 100);
+        var cubeGeometry = new THREE.BoxGeometry(width, height, depth);
         var cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        scene.add(cubeMesh);
 
-        // create the cube physics
+        // create the cube physics  without adding it to the world.
         var cubeBody = new CANNON.Body({ mass: 1 });
-        var cubeCollider = new CANNON.Box(new CANNON.Vec3(50, 10, 50));
+        var cubeCollider = new CANNON.Box(new CANNON.Vec3(width, height, depth));
         cubeBody.addShape(cubeCollider);
-        world.addBody(cubeBody);
 
-        // add cube to the array of game objects in the enviroment.
-        gameObjects.push(new GameObject(cubeBody, cubeMesh));
+        // create a pool of cubes.
+        var cubesPool = new Pool(cubeBody, cubeMesh);
 
-        // create 10 cubes to be in the pool of cubes
-        for (var i = 0; i < 10; i++) {
-            cubesPool.returnToPool(new GameObject(cubeBody, cubeMesh));
-        }
+        // call generate and update on intervals.
+        setInterval(generate, 100);
         setInterval(update, 1 / 60);
 
-        // render scene
+        // render scene.
         renderer.setSize(900, 600);
         (function render() {
             requestAnimationFrame(render);
             renderer.render(scene, camera);
         })();
-
         function update() {
-            cubeBody.position.z += 0.1;
-            console.log(cubeBody.position.z);
             for (var i = 0; i < gameObjects.length; i++) {
-                gameObjects[i].link();
+                if (gameObjects[i].position.z > zLimit && gameObjects[i].visible) {
+                    cubesPool.returnToPool(gameObjects[i]);
+                }
+                if (gameObjects[i].threeBody.visible) {
+                    gameObjects[i].position.z += 0.1;
+                    gameObjects[i].link();
+                    minZ = Math.min(minZ, gameObjects[i].position.z)
+                }
             }
         }
 
-       
+        function generate() {
+            var object = (cubesPool.getFromPool());
+            addToGame(object);
+            object.position.z = minZ - depth;
+        }
+
+        function addToGame(gameObjs) {
+
+            if (gameObjs.threeBody.parent == null) {
+
+                scene.add(gameObjs.threeBody);
+                world.addBody(gameObjs.cannonBody);
+                gameObjects.push(gameObjs);
+
+            }
+
+        }
     </script>
 </body>
 </html>
