@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <meta charset="utf-8" />
+    <script src="lib/cannon.js"></script>
+    <script src="lib/three.js"></script>
+    <script src="GameObject.js"></script>
+    <script src="lib/Queue.src.js"></script>
+    <script src="Pool.js"></script>
+</head>
+<body>
+    <script>
+        // create array for all game objects in the enviroment
+        var gameObjects = [];
+
+        // create a pool of cubes
+        var cubesPool = new Pool();
+
+        // initialize Three enviroment
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera(60, 16.0 / 9.0, 0.1, 1000);
+        var renderer = new THREE.WebGLRenderer();
+        document.body.appendChild(renderer.domElement);
+        scene.add(camera);
+        camera.position.z = 200;
+        camera.position.y = 50;
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+        // initialize Cannon world
+        var world = new CANNON.World();
+        world.gravity.set(0, -10, 0);
+
+        // create the cube mesh
+        var cubeMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        cubeMaterial.wireframe = true;
+        var cubeGeometry = new THREE.BoxGeometry(100, 20, 100);
+        var cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        scene.add(cubeMesh);
+
+        // create the cube physics
+        var cubeBody = new CANNON.Body({ mass: 1 });
+        var cubeCollider = new CANNON.Box(new CANNON.Vec3(50, 10, 50));
+        cubeBody.addShape(cubeCollider);
+        world.addBody(cubeBody);
+
+        // add cube to the array of game objects in the enviroment.
+        gameObjects.push(new GameObject(cubeBody, cubeMesh));
+
+        // create 10 cubes to be in the pool of cubes
+        for (var i = 0; i < 10; i++) {
+            cubesPool.returnToPool(new GameObject(cubeBody, cubeMesh));
+        }
+        setInterval(update, 1 / 60);
+
+        // render scene
+        renderer.setSize(900, 600);
+        (function render() {
+            requestAnimationFrame(render);
+            renderer.render(scene, camera);
+        })();
+
+        function update() {
+            cubeBody.position.z += 0.1;
+            console.log(cubeBody.position.z);
+            for (var i = 0; i < gameObjects.length; i++) {
+                gameObjects[i].link();
+            }
+        }
+
+       
+    </script>
+</body>
+</html>
