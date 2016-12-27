@@ -13,37 +13,48 @@
     <script>
         // create queue for all game objects in the enviroment.
         var gameObjects = [];
-        let width = 50, height = 20, depth = 50;
+        let width = 50, height = 20, depth = 400, radius = 20;
         let zLimit = 200;
         var minZ = 0;
 
         // initialize Three enviroment.
         var scene = new THREE.Scene();
-        var camera = new THREE.PerspectiveCamera(60, 16.0 / 9.0, 0.1, 1000);
-        var renderer = new THREE.WebGLRenderer();
+        var camera = new THREE.PerspectiveCamera(60, 16.0 / 9, 0.1, 10000);
+        var renderer = new THREE.WebGLRenderer({ antialias: true });
         document.body.appendChild(renderer.domElement);
         scene.add(camera);
-        camera.position.z = 200;
-        camera.position.y = 50;
+        camera.position.set(0, 0, 10);
         camera.lookAt(new THREE.Vector3(0, 0, 0));
 
         // initialize Cannon world.
         var world = new CANNON.World();
         world.gravity.set(0, -10, 0);
 
-        // create the cube mesh without adding it to the scene.
-        var cubeMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-        cubeMaterial.wireframe = true;
-        var cubeGeometry = new THREE.BoxGeometry(width, height, depth);
-        var cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        // create the tube mesh without adding it to the scene.
+        var CustomSinCurve = THREE.Curve.create(
+           function (scale) { //custom curve constructor
+               this.scale = (scale === undefined) ? 1 : scale;
+           },
+           function (t) { //getPoint: t is between 0-1
+               var tx = 0;
+               var ty = 0;
+               var tz = t;
+               return new THREE.Vector3(tx, ty, tz).multiplyScalar(this.scale);
+           }
+        );
+        var path = new CustomSinCurve(500);
+        var tubeGeometry = new THREE.TubeGeometry(path, 10, radius, 9, false);
+        var tubeMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        tubeMaterial.wireframe = true;
+        var tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
 
-        // create the cube physics  without adding it to the world.
-        var cubeBody = new CANNON.Body({ mass: 1 });
-        var cubeCollider = new CANNON.Box(new CANNON.Vec3(width, height, depth));
-        cubeBody.addShape(cubeCollider);
+        // create the tube physics  without adding it to the world.
+        var tubeBody = new CANNON.Body({ mass: 1 });
+        var tubeCollider = new CANNON.Box(new CANNON.Vec3(width, height, depth));
+        tubeBody.addShape(tubeCollider);
 
-        // create a pool of cubes.
-        var cubesPool = new Pool(cubeBody, cubeMesh);
+        // create a pool of tubes.
+        var tubesPool = new Pool(tubeBody, tubeMesh);
 
         // call generate and update on intervals.
         setInterval(generate, 100);
@@ -58,22 +69,20 @@
         function update() {
             for (var i = 0; i < gameObjects.length; i++) {
                 if (gameObjects[i].position.z > zLimit && gameObjects[i].visible) {
-                    cubesPool.returnToPool(gameObjects[i]);
+                    tubesPool.returnToPool(gameObjects[i]);
                 }
                 if (gameObjects[i].threeBody.visible) {
-                    gameObjects[i].position.z += 0.1;
+                    gameObjects[i].position.z += 0.3;
                     gameObjects[i].link();
                     minZ = Math.min(minZ, gameObjects[i].position.z)
                 }
             }
         }
-
         function generate() {
-            var object = (cubesPool.getFromPool());
+            var object = (tubesPool.getFromPool());
             addToGame(object);
             object.position.z = minZ - depth;
         }
-
         function addToGame(gameObjs) {
 
             if (gameObjs.threeBody.parent == null) {
@@ -81,10 +90,10 @@
                 scene.add(gameObjs.threeBody);
                 world.addBody(gameObjs.cannonBody);
                 gameObjects.push(gameObjs);
-
             }
-
         }
+
+
     </script>
 </body>
 </html>
