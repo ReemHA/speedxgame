@@ -16,11 +16,18 @@
         let tubeWidthCollider = 50, tubeHeightCollider = 20, tubeDepthCollider = 400, radius = 20;
         let zLimit = 200, obstacleWidth = 3, obstacleHeight = 1, obstacleDepth = 3;
         var minZ = 0;
+        window.onkeydown = movePlayer;
+
+        // moving in circle parameters.
+        var angle = -90,
+            speed = (2 * Math.PI) / 10,
+            rotational_angle = 20;
 
         // initialize Three enviroment.
         var scene = new THREE.Scene();
         var camera = new THREE.PerspectiveCamera(60, 16.0 / 9, 0.1, 10000);
         var renderer = new THREE.WebGLRenderer({ antialias: true });
+        var texture = THREE.ImageUtils.loadTexture("gamepic.jpg");
         document.body.appendChild(renderer.domElement);
         scene.add(camera);
         camera.position.set(0, 0, 10);
@@ -45,8 +52,9 @@
            }
         );
         var path = new CustomSinCurve(500);
-        var tubeGeometry = new THREE.TubeGeometry(path, 8, radius, 10, false);
-        var tubeMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+
+        var tubeGeometry = new THREE.TubeGeometry(path, 70, radius, 9, false);
+        var tubeMaterial = new THREE.MeshBasicMaterial({map:texture, color: 0xd3d3d3 });
         tubeMaterial.wireframe = true;
         var tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
 
@@ -71,12 +79,26 @@
         // create a pool of obstacles.
         var obstaclePool = new Pool(obstacleBody, obstacleMesh);
 
+        // adding the player.
+        var materialplayer = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        var playerGeometry = new THREE.BoxGeometry(2, 2, 2);
+        var player = new THREE.Mesh(playerGeometry, materialplayer);
+
+        player.position.x = 0;
+        player.position.y = -10;  //-5 //remade to follow the pattern
+        player.position.z = 0;
+        scene.add(player);
+
         // call generate and update on intervals.
         setInterval(generate, 150);
         setInterval(update, 1 / 60);
 
+        // adding camera to the player.
+        camera.position.set(player.position.x, player.position.y, player.position.z);
+
         // render scene.
-        renderer.setSize(900, 600);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
         (function render() {
             requestAnimationFrame(render);
             renderer.render(scene, camera);
@@ -130,6 +152,40 @@
             }
         }
 
+
+        // function resposible for moving the player and the camera
+        function movePlayer(event) {
+
+            //Testing
+            console.log(event.keyCode);
+            console.log("x" + player.position.x);
+            console.log("y" + player.position.y);
+            console.log("z" + player.position.z);
+
+
+            switch (event.keyCode) {
+                //left
+                case 37:
+                    // speed * delta_time
+                    angle += speed * (1.0 / 6);  
+                    player.position.x = Math.cos(angle) * (radius - 3);
+                    player.position.y = Math.sin(angle) * (radius - 3);
+
+                    //moving the camera
+                    camera.position.set(player.position.x, player.position.y, player.position.z);
+                    break;
+
+                //right
+                case 39:
+                    // speed * delta_time
+                    angle -= speed * (1.0 / 6);  
+                    player.position.x = Math.cos(angle) * (radius - 3);
+                    player.position.y = Math.sin(angle) * (radius - 3);
+                    //moving the camera
+                    camera.position.set(player.position.x, player.position.y, player.position.z);
+                    break;
+            }
+        }
 
     </script>
 </body>
