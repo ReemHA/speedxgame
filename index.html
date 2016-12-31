@@ -13,8 +13,8 @@
     <script>
         // create queue for all game objects in the enviroment.
         var gameObjects = [];
-        let width = 50, height = 20, depth = 400, radius = 20;
-        let zLimit = 200;
+        let tubeWidthCollider = 50, tubeHeightCollider = 20, tubeDepthCollider = 400, radius = 20;
+        let zLimit = 200, obstacleWidth = 3, obstacleHeight = 1, obstacleDepth = 3;
         var minZ = 0;
 
         // initialize Three enviroment.
@@ -36,28 +36,43 @@
                this.scale = (scale === undefined) ? 1 : scale;
            },
            function (t) { //getPoint: t is between 0-1
-               var tx = 0;
-               var ty = 0;
-               var tz = t;
+               if (true) {
+                   var tx = 0;
+                   var ty = 0;
+                   var tz = t;
+               }
                return new THREE.Vector3(tx, ty, tz).multiplyScalar(this.scale);
            }
         );
         var path = new CustomSinCurve(500);
-        var tubeGeometry = new THREE.TubeGeometry(path, 10, radius, 9, false);
+        var tubeGeometry = new THREE.TubeGeometry(path, 8, radius, 10, false);
         var tubeMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         tubeMaterial.wireframe = true;
         var tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
 
         // create the tube physics  without adding it to the world.
         var tubeBody = new CANNON.Body({ mass: 1 });
-        var tubeCollider = new CANNON.Box(new CANNON.Vec3(width, height, depth));
+        var tubeCollider = new CANNON.Box(new CANNON.Vec3(tubeWidthCollider, tubeHeightCollider, tubeDepthCollider));
         tubeBody.addShape(tubeCollider);
 
         // create a pool of tubes.
         var tubesPool = new Pool(tubeBody, tubeMesh);
 
+        // create obstacle mesh without adding it to the scene.
+        var obstacleGeometry = new THREE.BoxGeometry(obstacleWidth, obstacleHeight, obstacleDepth);
+        var obstacleMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        var obstacleMesh = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
+
+        // create obstacle physics without adding it to the scene.
+        var obstacleBody = new CANNON.Body({ mass: 1 });
+        var obstacleCollider = new CANNON.Box(new CANNON.Vec3(obstacleWidth, obstacleHeight, obstacleDepth));
+        obstacleBody.addShape(obstacleCollider);
+
+        // create a pool of obstacles.
+        var obstaclePool = new Pool(obstacleBody, obstacleMesh);
+
         // call generate and update on intervals.
-        setInterval(generate, 100);
+        setInterval(generate, 150);
         setInterval(update, 1 / 60);
 
         // render scene.
@@ -79,17 +94,39 @@
             }
         }
         function generate() {
-            var object = (tubesPool.getFromPool());
-            addToGame(object);
-            object.position.z = minZ - depth;
+            var tubeObj = [];
+            var obstacleObj = [];
+            tubeObj.push((tubesPool.getFromPool()));
+            for (var i = 0; i <= 2; i++) {
+                obstacleObj[i] = obstaclePool.getFromPool();
+            };
+            addToGame(tubeObj);
+            generatePosition(obstacleObj);
+            addToGame(obstacleObj);
+            for (var i = 0; i < tubeObj.length; i++) {
+                tubeObj[i].position.z = minZ - tubeDepthCollider;
+            };
+            for (var i = 0; i < obstacleObj.length; i++) {
+                obstacleObj[i].position.z = minZ - obstacleDepth;
+            };
         }
         function addToGame(gameObjs) {
+            for (var i = 0; i < gameObjs.length; i++) {
+                if (gameObjs[i].threeBody.parent == null) {
+                    scene.add(gameObjs[i].threeBody);
+                    world.addBody(gameObjs[i].cannonBody);
+                    gameObjects.push(gameObjs[i]);
+                }
+            };
+            
+        }
 
-            if (gameObjs.threeBody.parent == null) {
-
-                scene.add(gameObjs.threeBody);
-                world.addBody(gameObjs.cannonBody);
-                gameObjects.push(gameObjs);
+        function generatePosition(gameObjs) {
+            var positionX = [-15, -8, 8, 15]
+            for (var i = 0; i < gameObjs.length; i++) {
+                gameObjs[i].position.set(positionX[Math.floor(Math.random() * positionX.length)], (Math.random() * 20) - 10, 0);
+                //gameObjs.rotation.z = ((Math.random() * 5));
+                console.log(gameObjs[i].position);
             }
         }
 
