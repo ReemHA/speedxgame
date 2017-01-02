@@ -5,17 +5,20 @@
     <meta charset="utf-8" />
     <script src="lib/cannon.js"></script>
     <script src="lib/three.js"></script>
-    <script src="GameObject.js"></script>
+    <script src="js/GameObject.js"></script>
+    <script src="js/Zorque_Regular.typeface.js"></script>
     <script src="lib/Queue.src.js"></script>
-    <script src="Pool.js"></script>
+    <script src="js/Pool.js"></script>
 </head>
 <body>
     <script>
         // create queue for all game objects in the enviroment.
-        var gameObjects = [];
+        var tubeGameObjects = [];
+        var obstaclesGameObjects = [];
         let tubeWidthCollider = 50, tubeHeightCollider = 20, tubeDepthCollider = 400, radius = 20;
-        let zLimit = 200, obstacleWidth = 3, obstacleHeight = 1, obstacleDepth = 3;
+        let zLimit = 200, obstacleWidth = 5, obstacleHeight = 5, obstacleDepth = 10;
         var minZ = 0;
+        var playerGameObject;
         window.onkeydown = movePlayer;
 
         // moving in circle parameters.
@@ -27,15 +30,14 @@
         var scene = new THREE.Scene();
         var camera = new THREE.PerspectiveCamera(60, 16.0 / 9, 0.1, 10000);
         var renderer = new THREE.WebGLRenderer({ antialias: true });
-        var texture = THREE.ImageUtils.loadTexture("gamepic.jpg");
+        var texture = THREE.ImageUtils.loadTexture("textures/gamepic.jpg");
+        var obstaclesTexture = THREE.ImageUtils.loadTexture("textures/metalbox.jpg");
         document.body.appendChild(renderer.domElement);
-        scene.add(camera);
-        camera.position.set(0, 0, 10);
-        camera.lookAt(new THREE.Vector3(0, 0, 0));
+
 
         // initialize Cannon world.
         var world = new CANNON.World();
-        world.gravity.set(0, -10, 0);
+        world.gravity.set(0, 0, 0);
 
         // create the tube mesh without adding it to the scene.
         var CustomSinCurve = THREE.Curve.create(
@@ -52,15 +54,14 @@
            }
         );
         var path = new CustomSinCurve(500);
-
         var tubeGeometry = new THREE.TubeGeometry(path, 70, radius, 9, false);
-        var tubeMaterial = new THREE.MeshBasicMaterial({map:texture, color: 0xd3d3d3 });
+        var tubeMaterial = new THREE.MeshBasicMaterial({ map: texture, color: 0xd3d3d3 });
         tubeMaterial.wireframe = true;
         var tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
 
         // create the tube physics  without adding it to the world.
-        var tubeBody = new CANNON.Body({ mass: 1 });
-        var tubeCollider = new CANNON.Box(new CANNON.Vec3(tubeWidthCollider, tubeHeightCollider, tubeDepthCollider));
+        var tubeBody = new CANNON.Body({ mass: 0 });
+        var tubeCollider = new CANNON.Box(new CANNON.Vec3(0, 0, 0));
         tubeBody.addShape(tubeCollider);
 
         // create a pool of tubes.
@@ -68,50 +69,67 @@
 
         // create obstacle mesh without adding it to the scene.
         var obstacleGeometry = new THREE.BoxGeometry(obstacleWidth, obstacleHeight, obstacleDepth);
-        var obstacleMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        var obstacleMaterial = new THREE.MeshBasicMaterial({ map: obstaclesTexture, color: 0xd3d3d3 });
         var obstacleMesh = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
 
         // create obstacle physics without adding it to the scene.
         var obstacleBody = new CANNON.Body({ mass: 1 });
-        var obstacleCollider = new CANNON.Box(new CANNON.Vec3(obstacleWidth, obstacleHeight, obstacleDepth));
+        var obstacleCollider = new CANNON.Box(new CANNON.Vec3(obstacleWidth / 8, obstacleHeight / 8, obstacleDepth / 8));
         obstacleBody.addShape(obstacleCollider);
 
         // create a pool of obstacles.
         var obstaclePool = new Pool(obstacleBody, obstacleMesh);
 
-        // adding the player.
+        // adding mesh to the player .
         var materialplayer = new THREE.MeshBasicMaterial({ color: 0xffffff });
         var playerGeometry = new THREE.BoxGeometry(2, 2, 2);
-        var player = new THREE.Mesh(playerGeometry, materialplayer);
-
-        player.position.x = 0;
-        player.position.y = -10;  //-5 //remade to follow the pattern
-        player.position.z = 0;
-        scene.add(player);
+        var playerMesh = new THREE.Mesh(playerGeometry, materialplayer);
+        playerMesh.add(camera);
+        scene.add(playerMesh);
+        
+        // adding physics to the player.
+        var playerCollider = new CANNON.Box(new CANNON.Vec3(obstacleWidth / 4, obstacleHeight / 4, obstacleDepth / 4));
+        var playerBody = new CANNON.Body({ mass: 1 });
+        playerBody.position.x = 0;
+        playerBody.position.y = -10;
+        playerBody.position.z = 0;
+        playerBody.addShape(playerCollider);
+        playerBody.addEventListener("collide", function () {
+        });
+        world.addBody(playerBody);
+        playerGameObject = new GameObject(playerBody, playerMesh);
 
         // call generate and update on intervals.
         setInterval(generate, 150);
         setInterval(update, 1 / 60);
 
-        // adding camera to the player.
-        camera.position.set(player.position.x, player.position.y, player.position.z);
-
         // render scene.
         renderer.setSize(window.innerWidth, window.innerHeight);
-
         (function render() {
             requestAnimationFrame(render);
             renderer.render(scene, camera);
         })();
         function update() {
-            for (var i = 0; i < gameObjects.length; i++) {
-                if (gameObjects[i].position.z > zLimit && gameObjects[i].visible) {
-                    tubesPool.returnToPool(gameObjects[i]);
+            world.step(1.0 / 60);
+            playerGameObject.link();
+            for (var i = 0; i < tubeGameObjects.length; i++) {
+                if (tubeGameObjects[i].position.z > zLimit && tubeGameObjects[i].visible) {
+                    tubesPool.returnToPool(tubeGameObjects[i]);
                 }
-                if (gameObjects[i].threeBody.visible) {
-                    gameObjects[i].position.z += 0.3;
-                    gameObjects[i].link();
-                    minZ = Math.min(minZ, gameObjects[i].position.z)
+                if (tubeGameObjects[i].threeBody.visible) {
+                    tubeGameObjects[i].position.z += 0.3;
+                    tubeGameObjects[i].link();
+                    minZ = Math.min(minZ, tubeGameObjects[i].position.z)
+                }
+            }
+            for (var i = 0; i < obstaclesGameObjects.length; i++) {
+                if (obstaclesGameObjects[i].position.z > zLimit && obstaclesGameObjects[i].visible) {
+                    obstaclePool.returnToPool(obstaclesGameObjects[i]);
+                }
+                if (obstaclesGameObjects[i].threeBody.visible) {
+                    obstaclesGameObjects[i].position.z += 0.3;
+                    obstaclesGameObjects[i].link();
+                    minZ = Math.min(minZ, obstaclesGameObjects[i].position.z)
                 }
             }
         }
@@ -119,12 +137,12 @@
             var tubeObj = [];
             var obstacleObj = [];
             tubeObj.push((tubesPool.getFromPool()));
-            for (var i = 0; i <= 2; i++) {
+            for (var i = 0; i < 1; i++) {
                 obstacleObj[i] = obstaclePool.getFromPool();
             };
-            addToGame(tubeObj);
+            addToGame(tubeObj, true);
             generatePosition(obstacleObj);
-            addToGame(obstacleObj);
+            addToGame(obstacleObj, false);
             for (var i = 0; i < tubeObj.length; i++) {
                 tubeObj[i].position.z = minZ - tubeDepthCollider;
             };
@@ -132,61 +150,53 @@
                 obstacleObj[i].position.z = minZ - obstacleDepth;
             };
         }
-        function addToGame(gameObjs) {
+        function addToGame(gameObjs, isTube) {
             for (var i = 0; i < gameObjs.length; i++) {
                 if (gameObjs[i].threeBody.parent == null) {
+                    if (isTube) {
+                        tubeGameObjects.push(gameObjs[i]);
+                    } else {
+                        obstaclesGameObjects.push(gameObjs[i]);
+                    }
                     scene.add(gameObjs[i].threeBody);
                     world.addBody(gameObjs[i].cannonBody);
-                    gameObjects.push(gameObjs[i]);
                 }
             };
-            
-        }
 
+        }
         function generatePosition(gameObjs) {
-            var positionX = [-15, -8, 8, 15]
+            var positionX = [-8, -15, 15, 8];
             for (var i = 0; i < gameObjs.length; i++) {
                 gameObjs[i].position.set(positionX[Math.floor(Math.random() * positionX.length)], (Math.random() * 20) - 10, 0);
                 //gameObjs.rotation.z = ((Math.random() * 5));
                 console.log(gameObjs[i].position);
             }
         }
-
-
         // function resposible for moving the player and the camera
         function movePlayer(event) {
-
-            //Testing
-            console.log(event.keyCode);
-            console.log("x" + player.position.x);
-            console.log("y" + player.position.y);
-            console.log("z" + player.position.z);
-
-
             switch (event.keyCode) {
                 //left
                 case 37:
                     // speed * delta_time
-                    angle += speed * (1.0 / 6);  
-                    player.position.x = Math.cos(angle) * (radius - 3);
-                    player.position.y = Math.sin(angle) * (radius - 3);
+                    angle += speed * (1.0 / 6);
+                    playerBody.position.x = Math.cos(angle) * (radius - 3);
+                    playerBody.position.y = Math.sin(angle) * (radius - 3);
 
                     //moving the camera
-                    camera.position.set(player.position.x, player.position.y, player.position.z);
+                    //camera.position.set(playerMesh.position.x, playerMesh.position.y, playerMesh.position.z);
                     break;
 
-                //right
+                    //right
                 case 39:
                     // speed * delta_time
-                    angle -= speed * (1.0 / 6);  
-                    player.position.x = Math.cos(angle) * (radius - 3);
-                    player.position.y = Math.sin(angle) * (radius - 3);
+                    angle -= speed * (1.0 / 6);
+                    playerBody.position.x = Math.cos(angle) * (radius - 3);
+                    playerBody.position.y = Math.sin(angle) * (radius - 3);
                     //moving the camera
-                    camera.position.set(player.position.x, player.position.y, player.position.z);
+                    //camera.position.set(playerMesh.position.x, playerMesh.position.y, playerMesh.position.z);
                     break;
             }
         }
-
     </script>
 </body>
 </html>
